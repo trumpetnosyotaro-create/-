@@ -420,9 +420,19 @@
       'voice6.mp3'
     ];
     let voiceBuffers = new Array(voiceFiles.length).fill(null);
-    let isFetchingVoice = false;
 
-    chibi.addEventListener('click', async () => {
+    // 事前にすべての音声を読み込んでデコードしておく（スマホの遅延・ブロック対策）
+    voiceFiles.forEach(async (file, idx) => {
+      try {
+        const res = await fetch(file);
+        const arrayBuffer = await res.arrayBuffer();
+        voiceBuffers[idx] = await actx.decodeAudioData(arrayBuffer);
+      } catch (e) {
+        console.error('Voice preload error:', e);
+      }
+    });
+
+    chibi.addEventListener('click', () => {
       // AudioContextがサスペンド状態なら再開（メトロノーム機能の維持のため）
       if (actx.state === 'suspended') actx.resume();
 
@@ -435,24 +445,15 @@
       const idx = Math.floor(Math.random() * voiceFiles.length);
 
       try {
-        if (!voiceBuffers[idx]) {
-          // 初回再生時はロードする
-          if (isFetchingVoice) return; // 二重リクエスト防止
-          isFetchingVoice = true;
-          const res = await fetch(voiceFiles[idx]);
-          const arrayBuffer = await res.arrayBuffer();
-          voiceBuffers[idx] = await actx.decodeAudioData(arrayBuffer);
-          isFetchingVoice = false;
+        if (voiceBuffers[idx]) {
+          const source = actx.createBufferSource();
+          source.buffer = voiceBuffers[idx];
+          source.connect(actx.destination);
+          source.start(0);
         }
 
-        // 再生
-        const source = actx.createBufferSource();
-        source.buffer = voiceBuffers[idx];
-        source.connect(actx.destination);
-        source.start(0);
       } catch (err) {
         console.error('Voice play error:', err);
-        isFetchingVoice = false;
       }
     });
 
