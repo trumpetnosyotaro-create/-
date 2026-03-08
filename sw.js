@@ -1,16 +1,16 @@
-const CACHE_NAME = 'metronome-cache-v2';
+const CACHE_NAME = 'metronome-cache-v3';
 const urlsToCache = [
     './',
     './index.html',
     './manifest.json',
     './icon.png',
     './chibi.png',
-    './voice1.mov',
-    './voice2.mov',
-    './voice3.mov',
-    './voice4.mov',
-    './voice5.mov',
-    './voice6.mov'
+    './voice1.mp3',
+    './voice2.mp3',
+    './voice3.mp3',
+    './voice4.mp3',
+    './voice5.mp3',
+    './voice6.mp3'
 ];
 
 self.addEventListener('install', event => {

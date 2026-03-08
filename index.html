@@ -410,28 +410,19 @@
       }, 2100);
     });
 
-    // ─── キャラクターの声再生 (モバイル対応) ───────────────────────────
+    // ─── キャラクターの声再生 ───────────────────────────
     const voiceFiles = [
-      'voice1.mov',
-      'voice2.mov',
-      'voice3.mov',
-      'voice4.mov',
-      'voice5.mov',
-      'voice6.mov'
+      'voice1.mp3',
+      'voice2.mp3',
+      'voice3.mp3',
+      'voice4.mp3',
+      'voice5.mp3',
+      'voice6.mp3'
     ];
+    let voiceBuffers = new Array(voiceFiles.length).fill(null);
+    let isFetchingVoice = false;
 
-    // Web Audio APIのdecodeAudioDataではなく、HTML5のVideo要素を利用（iOS等での.mov再生のため）
-    const voicePlayers = voiceFiles.map(src => {
-      const v = document.createElement('video');
-      v.src = src;
-      v.preload = 'auto';
-      v.style.display = 'none';
-      v.playsInline = true;
-      document.body.appendChild(v);
-      return v;
-    });
-
-    chibi.addEventListener('click', () => {
+    chibi.addEventListener('click', async () => {
       // AudioContextがサスペンド状態なら再開（メトロノーム機能の維持のため）
       if (actx.state === 'suspended') actx.resume();
 
@@ -442,15 +433,26 @@
 
       // ランダムに選んで再生
       const idx = Math.floor(Math.random() * voiceFiles.length);
-      const player = voicePlayers[idx];
 
       try {
-        player.currentTime = 0;
-        player.play().catch(err => {
-          console.error('Voice play error on mobile:', err);
-        });
+        if (!voiceBuffers[idx]) {
+          // 初回再生時はロードする
+          if (isFetchingVoice) return; // 二重リクエスト防止
+          isFetchingVoice = true;
+          const res = await fetch(voiceFiles[idx]);
+          const arrayBuffer = await res.arrayBuffer();
+          voiceBuffers[idx] = await actx.decodeAudioData(arrayBuffer);
+          isFetchingVoice = false;
+        }
+
+        // 再生
+        const source = actx.createBufferSource();
+        source.buffer = voiceBuffers[idx];
+        source.connect(actx.destination);
+        source.start(0);
       } catch (err) {
         console.error('Voice play error:', err);
+        isFetchingVoice = false;
       }
     });
 
