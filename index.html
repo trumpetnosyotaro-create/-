@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Metronome</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0d0f14">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0d0f14;
+      --card: #1e2433;
+      --accent: #7c6af7;
+      --acct2: #e07cf5;
+      --tick: #f5c842;
+      --text: #e8eaf0;
+      --muted: #6b7280;
+      --surface: #2d3748;
+    }
+
+    html,
+    body {
+      height: 100%;
+      background: var(--bg);
+      font-family: 'Inter', sans-serif;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 20px;
+      width: 100%;
+      max-width: 360px;
+      padding: 20px;
+    }
+
+    .title {
+      font-size: 11px;
+      letter-spacing: 0.35em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    /* ── ステージ（キャラ + フラッシャー） ─────────────────── */
+    .stage {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      gap: 30px;
+      width: 100%;
+      padding-bottom: 10px;
+    }
+
+    /* フラッシュエリア */
+    .flash-section {
+      flex: 0 0 100px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    /* メインの点滅ランプ */
+    .beat-lamp {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: var(--card);
+      border: 4px solid var(--surface);
+      box-shadow: inset 0 4px 6px rgba(0, 0, 0, 0.5);
+      transition: background 0.05s, transform 0.05s, box-shadow 0.05s;
+    }
+
+    .beat-lamp.on {
+      background: radial-gradient(circle at 30% 30%, #fff, var(--tick));
+      border-color: var(--tick);
+      transform: scale(1.1);
+      box-shadow: 0 0 30px var(--tick), inset 0 0 10px rgba(255, 255, 255, 0.8);
+    }
+
+    /* ── キャラエリア ─────────────────────────── */
+    .character-section {
+      flex: 0 0 140px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* 吹き出し */
+    .speech-bubble {
+      position: relative;
+      background: #fff;
+      border-radius: 14px;
+      padding: 8px 16px 6px;
+      margin-bottom: 12px;
+      text-align: center;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+      min-width: 80px;
+    }
+
+    .speech-bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      border: 10px solid transparent;
+      border-top-color: #fff;
+      border-bottom: 0;
+    }
+
+    .bubble-bpm {
+      font-size: 32px;
+      font-weight: 700;
+      color: #1a1a2e;
+      line-height: 1;
+    }
+
+    .bubble-label {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.2em;
+      color: var(--accent);
+      margin-top: 2px;
+    }
+
+    .chibi-img {
+      width: 140px;
+      height: auto;
+      filter: drop-shadow(0 4px 14px rgba(124, 106, 247, 0.4));
+      transform-origin: bottom center;
+      cursor: pointer;
+    }
+
+    @keyframes jump {
+      0% {
+        transform: translateY(0) scaleY(1);
+      }
+
+      30% {
+        transform: translateY(-10px) scaleY(1.05);
+      }
+
+      70% {
+        transform: translateY(-3px) scaleY(0.95);
+      }
+
+      100% {
+        transform: translateY(0) scaleY(1);
+      }
+    }
+
+    .chibi-img.pop {
+      animation: jump 0.15s ease forwards;
+    }
+
+    /* ── スライダー ──────────────────────────── */
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .adj-btn {
+      width: 44px;
+      height: 44px;
+      border: none;
+      border-radius: 50%;
+      background: var(--card);
+      color: var(--text);
+      font-size: 22px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .adj-btn:active {
+      background: var(--accent);
+      transform: scale(0.9);
+    }
+
+    input[type=range] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 8px;
+      border-radius: 4px;
+      background: var(--card);
+      outline: none;
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--acct2));
+      cursor: pointer;
+      box-shadow: 0 0 10px rgba(124, 106, 247, 0.5);
+    }
+
+    /* ── ボタン ──────────────────────────────── */
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      width: 100%;
+      margin-top: 10px;
+    }
+
+    .btn {
+      flex: 1;
+      border: none;
+      border-radius: 16px;
+      padding: 18px;
+      font-family: 'Inter', sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+
+    .btn:active {
+      transform: scale(0.95);
+    }
+
+    #startBtn {
+      background: linear-gradient(135deg, var(--accent), var(--acct2));
+      color: #fff;
+      box-shadow: 0 4px 18px rgba(124, 106, 247, 0.4);
+    }
+
+    #startBtn.running {
+      background: var(--card);
+      color: var(--accent);
+      box-shadow: none;
+    }
+
+    #tapBtn {
+      background: var(--card);
+      color: var(--text);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app">
+
+    <div class="title">Metronome</div>
+
+    <div class="stage">
+      <!-- ランプ -->
+      <div class="flash-section">
+        <div class="beat-lamp" id="lamp"></div>
+      </div>
+
+      <!-- キャラクター -->
+      <div class="character-section">
+        <div class="speech-bubble">
+          <div class="bubble-bpm" id="bpmDisplay">120</div>
+          <div class="bubble-label">BPM</div>
+        </div>
+        <img src="chibi.png" alt="chibi" class="chibi-img" id="chibi" />
+      </div>
+    </div>
+
+    <div class="slider-row">
+      <button class="adj-btn" id="minusBtn">−</button>
+      <input type="range" id="bpmSlider" min="30" max="250" value="120" />
+      <button class="adj-btn" id="plusBtn">＋</button>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn" id="startBtn">▶ Start</button>
+      <button class="btn" id="tapBtn">Tap</button>
+    </div>
+
+  </div>
+
+  <script>
+    let bpm = 120;
+    let running = false;
+
+    // スケジューラ変数
+    let nextNoteTime = 0.0;
+    let schedulerTimer = null;
+    const lookahead = 0.15; // 150ms 先まで予約
+    const schedInterval = 25;  // 25ms ごとにチェック
+
+    const bpmDisp = document.getElementById('bpmDisplay');
+    const slider = document.getElementById('bpmSlider');
+    const startBtn = document.getElementById('startBtn');
+    const tapBtn = document.getElementById('tapBtn');
+    const lamp = document.getElementById('lamp');
+    const chibi = document.getElementById('chibi');
+
+    // ─── Web Audio ─────────────────────────────────────
+    const actx = new (window.AudioContext || window.webkitAudioContext)();
+
+    function playClickAt(time) {
+      const osc = actx.createOscillator();
+      const g = actx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(900, time);
+      g.gain.setValueAtTime(0.55, time);
+      g.gain.exponentialRampToValueAtTime(0.001, time + 0.065);
+      osc.connect(g);
+      g.connect(actx.destination);
+      osc.start(time);
+      osc.stop(time + 0.07);
+    }
+
+    // ─── ビジュアル ────────────────────────────────────
+    function flashBeat() {
+      // ランプを光らせる
+      lamp.classList.add('on');
+      setTimeout(() => lamp.classList.remove('on'), 80);
+
+      // キャラをバウンス
+      chibi.classList.remove('pop');
+      void chibi.offsetWidth;
+      chibi.classList.add('pop');
+    }
+
+    // ─── ルックアヘッドスケジューラー ──────────────────
+    function scheduleNote(audioTime) {
+      playClickAt(audioTime);
+
+      const delayMs = Math.max(0, (audioTime - actx.currentTime) * 1000);
+      setTimeout(() => {
+        if (running) {
+          flashBeat();
+        }
+      }, delayMs);
+    }
+
+    function scheduler() {
+      while (nextNoteTime < actx.currentTime + lookahead) {
+        scheduleNote(nextNoteTime);
+        nextNoteTime += 60.0 / bpm;
+      }
+      schedulerTimer = setTimeout(scheduler, schedInterval);
+    }
+
+    // ─── 操作制御 ──────────────────────────────────────
+    function start() {
+      if (actx.state === 'suspended') actx.resume();
+      running = true;
+      startBtn.textContent = '■ Stop';
+      startBtn.classList.add('running');
+      nextNoteTime = actx.currentTime;
+      scheduler();
+    }
+
+    function stop() {
+      running = false;
+      startBtn.textContent = '▶ Start';
+      startBtn.classList.remove('running');
+      clearTimeout(schedulerTimer);
+    }
+
+    startBtn.addEventListener('click', () => {
+      if (actx.state === 'suspended') actx.resume();
+      running ? stop() : start();
+    });
+
+    function updateBpm(val) {
+      bpm = Math.max(30, Math.min(250, val));
+      slider.value = bpm;
+      bpmDisp.textContent = bpm;
+    }
+
+    slider.addEventListener('input', () => updateBpm(+slider.value));
+    document.getElementById('minusBtn').addEventListener('click', () => updateBpm(bpm - 1));
+    document.getElementById('plusBtn').addEventListener('click', () => updateBpm(bpm + 1));
+
+    let tapTimes = [];
+    tapBtn.addEventListener('click', () => {
+      const now = Date.now();
+      tapTimes.push(now);
+      if (tapTimes.length > 5) tapTimes.shift();
+      if (tapTimes.length >= 2) {
+        const diffs = [];
+        for (let i = 1; i < tapTimes.length; i++) diffs.push(tapTimes[i] - tapTimes[i - 1]);
+        updateBpm(Math.round(60000 / (diffs.reduce((a, b) => a + b, 0) / diffs.length)));
+      }
+      setTimeout(() => {
+        if (tapTimes.length && Date.now() - tapTimes[tapTimes.length - 1] > 2000) tapTimes = [];
+      }, 2100);
+    });
+
+    // ─── キャラクターの声再生 ───────────────────────────
+    const voiceFiles = [
+      'voice1.mov',
+      'voice2.mov',
+      'voice3.mov',
+      'voice4.mov',
+      'voice5.mov',
+      'voice6.mov'
+    ];
+    let voiceBuffers = new Array(voiceFiles.length).fill(null);
+    let isFetchingVoice = false;
+
+    chibi.addEventListener('click', async () => {
+      // AudioContextがサスペンド状態なら再開
+      if (actx.state === 'suspended') actx.resume();
+
+      // ポップアニメーション
+      chibi.classList.remove('pop');
+      void chibi.offsetWidth;
+      chibi.classList.add('pop');
+
+      // ランダムに選ぶ
+      const idx = Math.floor(Math.random() * voiceFiles.length);
+
+      try {
+        if (!voiceBuffers[idx]) {
+          // 初回再生時はロードする
+          if (isFetchingVoice) return; // 既に別のリクエスト中なら待機する等の複雑な処理を避けるため簡易ブロック
+          isFetchingVoice = true;
+          const res = await fetch(voiceFiles[idx]);
+          const arrayBuffer = await res.arrayBuffer();
+          voiceBuffers[idx] = await actx.decodeAudioData(arrayBuffer);
+          isFetchingVoice = false;
+        }
+
+        // 再生
+        const source = actx.createBufferSource();
+        source.buffer = voiceBuffers[idx];
+        source.connect(actx.destination);
+        source.start(0);
+      } catch (err) {
+        console.error('Voice play error:', err);
+        isFetchingVoice = false;
+      }
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.code === 'Space') { e.preventDefault(); startBtn.click(); }
+      if (e.code === 'ArrowUp') updateBpm(bpm + 1);
+      if (e.code === 'ArrowDown') updateBpm(bpm - 1);
+      if (e.code === 'KeyT') tapBtn.click();
+    });
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+          .then(reg => console.log('SW registered!', reg))
+          .catch(err => console.log('SW registration failed: ', err));
+      });
+    }
+  </script>
+</body>
+
+</html>
